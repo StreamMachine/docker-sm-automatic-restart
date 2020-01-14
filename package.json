@@ -1,0 +1,23 @@
+{
+  "name": "docker-sm-automatic-restart",
+  "version": "1.0.0",
+  "description": "A docker image that alerts slack when an automated stream restart has taken place.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StreamMachine/docker-sm-automatic-restart.git"
+  },
+  "keywords": [
+    "alert"
+  ],
+  "author": "SCPR Devs",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/StreamMachine/docker-sm-automatic-restart/issues"
+  },
+  "homepage": "https://github.com/StreamMachine/docker-sm-automatic-restart#readme",
+  "dependencies": {}
+}
