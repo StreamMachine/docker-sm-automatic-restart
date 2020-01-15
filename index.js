@@ -1,12 +1,15 @@
 const http = require('http');
 const https = require('https');
 
+const SOURCE_KEY = process.env.SOURCE_KEY;
 const SOURCE_URL = process.env.SOURCE_URL;
+const STREAM_URL = process.env.STREAM_URL;
 const WEBHOOK_URL = process.env.WEBHOOK_URL;
 const PREPEND_MESSAGE = ':arrows_counterclockwise:';
 
-// JSON file that contains the body to POST to streammachine when creating streams.
+// JSON files that contains the body to POST to streammachine when creating streams and sources
 const streamsJson = require('./streams.json');
+const sourceJson = require('./source.json');
 
 /* Start: helper functions */
 const notify = function(message) {
@@ -43,7 +46,7 @@ const createStream = function(streamKey) {
     }
   };
 
-  const req = http.request(SOURCE_URL, options, (resp) => {
+  const req = http.request(STREAM_URL, options, (resp) => {
     let data = '';
     resp.on('data', (chunk) => {
       data += chunk;
@@ -64,16 +67,62 @@ const createStream = function(streamKey) {
   req.end();
 };
 
-const recreateStream = function(streamKey) {
+const deleteStream = function(streamKey) {
   console.log(`deleting stream: ${streamKey}`);
-  const deleteUrl = `${SOURCE_URL}/${streamKey}`;
+  const deleteUrl = `${STREAM_URL}/${streamKey}`;
   const options = {
     method: 'DELETE'
   };
 
   const req = http.request(deleteUrl, options, (resp) => {
     resp.on('data', () => {
-      createStream(streamKey);
+      console.log(`deleted stream: ${streamKey}`);
+    });
+  });
+  req.end();
+};
+
+const createSource = function(sourceKey) {
+  const config = JSON.stringify(sourceJson);
+  const options = {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': config.length
+    }
+  };
+
+  const req = http.request(SOURCE_URL, options, (resp) => {
+    let data = '';
+    resp.on('data', (chunk) => {
+      data += chunk;
+    });
+
+    resp.on('end', () => {
+      console.log(data)
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error("Error creating source: " + sourceKey);
+    console.error(error);
+  });
+
+  req.write(config);
+  req.end();
+};
+
+const recreateSource = function(sourceKey) {
+  console.log(`deleting source: ${sourceKey}`);
+  const deleteUrl = `${SOURCE_URL}/${sourceKey}`;
+  const options = {
+    method: 'DELETE'
+  };
+
+  const req = http.request(deleteUrl, options, (resp) => {
+    resp.on('data', () => {
+      console.log(`deleted source: ${sourceKey}`);
+      createSource(sourceKey);
     });
   });
   req.end();
@@ -81,9 +130,15 @@ const recreateStream = function(streamKey) {
 /* End: helper functions */
 
 
-// Check if we have the necessary environment variables
-if (SOURCE_URL === undefined) {
+// Check if we have the required environment variables
+if (SOURCE_KEY === undefined) {
+  console.error("No SOURCE_KEY");
+  return;
+} else if (SOURCE_URL === undefined) {
   console.error("No SOURCE_URL");
+  return;
+} else if (STREAM_URL === undefined) {
+  console.error("No STREAM_URL");
   return;
 } else if (WEBHOOK_URL === undefined) {
   console.error("No WEBHOOK_URL");
@@ -105,6 +160,7 @@ http.get(SOURCE_URL, (resp) => {
       notify_body.push("No streams found.");
       return;
     }
+    // Delete the streams
     body.forEach((stream) => {
       const source = stream.source;
       if (source === undefined) {
@@ -113,11 +169,27 @@ http.get(SOURCE_URL, (resp) => {
       }
 
       if (streamsJson[stream.key] !== undefined) {
-        recreateStream(stream.key);
-        notify_body.push(`Stream \`${stream.key}\` has been automatically recreated.`);
+        deleteStream(stream.key);
+      }
+    });
+
+    // Recreate the source mount
+    recreateSource(SOURCE_KEY);
+
+    // Create the streams
+    body.forEach((stream) => {
+      const source = stream.source;
+      if (source === undefined) {
+        notify_body.push(`No source for: ${stream.key}`);
+        return;
       }
 
+      if (streamsJson[stream.key] !== undefined) {
+        createStream(stream.key);
+        notify_body.push(`Stream \`${stream.key}\` has been automatically recreated.`);
+      }
     });
+
     if (notify_body.length > 0) {
       notify(notify_body.join("\n"));
     }
